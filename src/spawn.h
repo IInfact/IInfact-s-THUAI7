@@ -9,6 +9,7 @@
 #include "agent/agent.h"
 #include "agent/position.h"
 #include "agent/supply.h"
+#include "safe.h"
 
 #include <algorithm>
 #include <array>
@@ -26,22 +27,37 @@ int ManhattanDistance(float x1, float y1, float x2, float y2) {
   return std::abs((int)x1 - (int)x2) + std::abs((int)y1 - (int)y2);
 }
 
-auto ChooseSpawnpoint(thuai7_agent::Agent& agent) {
+auto ChooseSpawnpoint(thuai7_agent::Agent& agent,
+                      thuai7_agent::Supply& set_target_weapon,
+                      thuai7_agent::Supply& set_target_armor) {
   auto const& player_info_list = agent.all_player_info().value().get();
   auto const& supplies = agent.supplies().value().get();
   auto const& game_map = agent.map();
   auto const self_id = agent.self_id().value();
   auto const& self_info = player_info_list.at(self_id);
+  auto const safe_zone = agent.safe_zone().value().get();
+
+  thuai7_agent::Supply final_weapon = supplies[0];
+
   int nearest_armor_distance = 512;
   thuai7_agent::Supply nearest_armor = supplies[0];
-  int final_distance = 512;
+
+  int final_armor_distance = 512;
   thuai7_agent::Supply final_armor = supplies[0];
-  thuai7_agent::Supply final_weapon = supplies[0];
+
+  int nearest_another_weapon_distance = 512;
+  thuai7_agent::Supply nearest_another_weapon = supplies[0];
+
+  int final_another_weapon_distance = 512;
+  thuai7_agent::Supply final_another_weapon = supplies[0];
 
   auto self_position = self_info.position;
 
   for (thuai7_agent::Supply each_weapon : supplies) {
     if ((int)each_weapon.kind == 2) {
+      if (OutOfSafeZone(safe_zone,each_weapon.position)) {
+        continue;
+      }
       spdlog::info("Find AWM at {}", each_weapon.position);
       for (thuai7_agent::Supply each_armor : supplies) {
         if ((int)each_armor.kind == 6 || (int)each_armor.kind == 7) {
@@ -57,16 +73,43 @@ auto ChooseSpawnpoint(thuai7_agent::Agent& agent) {
           }
         }
       }
-      if (nearest_armor_distance < final_distance) {
-        final_distance = nearest_armor_distance;
+      if (nearest_armor_distance < final_armor_distance) {
+        final_armor_distance = nearest_armor_distance;
         final_armor = nearest_armor;
         final_weapon = each_weapon;
       }
     }
   }
+
+  for (thuai7_agent::Supply each_another_weapon : supplies) {
+    if ((int)each_another_weapon.kind == 1) {
+      if (OutOfSafeZone(safe_zone, each_another_weapon.position)) {
+        continue;
+      }
+      spdlog::info("Find Vector at {}", each_another_weapon.position);
+      if (ManhattanDistance(each_another_weapon.position.x,
+                            each_another_weapon.position.y,
+                            final_armor.position.x, final_armor.position.y) <
+          nearest_another_weapon_distance) {
+        nearest_another_weapon_distance = ManhattanDistance(
+            each_another_weapon.position.x, each_another_weapon.position.y,
+            final_armor.position.x, final_armor.position.y);
+        nearest_another_weapon = each_another_weapon;
+      }
+    }
+  }
+
+  final_another_weapon_distance = nearest_another_weapon_distance;
+  final_another_weapon = nearest_another_weapon;
+
   spdlog::info("Choose to spawn at AWM at {}", final_weapon.position);
   spdlog::info("Nearest armor is {}, at {}, distance is {}", final_armor.kind,
-               final_armor.position, final_distance);
+               final_armor.position, final_armor_distance);
+  spdlog::info("Nearest Another Weapon at {}, distance is {}", final_another_weapon.position,final_another_weapon_distance);
+
+  set_target_armor = final_armor;
+  set_target_weapon = final_another_weapon;
+
   return final_weapon.position;
 }
     

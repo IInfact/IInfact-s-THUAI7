@@ -15,6 +15,10 @@ auto format_as(FirearmKind object) -> std::string {
   return std::string(magic_enum::enum_name(object));
 }
 
+auto format_as(MedicineKind object) -> std::string {
+  return std::string(magic_enum::enum_name(object));
+}
+
 auto format_as(ItemKind object) -> std::string {
   return std::string(magic_enum::enum_name(object));
 }

@@ -1,6 +1,7 @@
 #include "agent.h"
 
 #include <fmt/format.h>
+#include <hv/Event.h>
 #include <hv/EventLoop.h>
 #include <hv/WebSocketClient.h>
 #include <hv/hloop.h>
@@ -14,7 +15,6 @@
 #include "agent/player_info.h"
 #include "agent/position.h"
 #include "agent/supply.h"
-#include "hv/Event.h"
 #include "message.h"
 
 namespace thuai7_agent {
@@ -55,44 +55,59 @@ auto Agent::IsGameReady() const -> bool {
 }
 
 void Agent::Abandon(SupplyKind target_supply, int count) {
+  spdlog::debug("{}.Abandon({}, {})", *this, target_supply, count);
   ws_client_->send(PerformAbandonMessage(count, token_, target_supply).json());
 }
 
 void Agent::PickUp(SupplyKind target_supply, int count) {
+  spdlog::debug("{}.PickUp({}, {})", *this, target_supply, count);
   ws_client_->send(PerformPickUpMessage(token_, target_supply, count).json());
 }
 
 void Agent::SwitchFirearm(FirearmKind target_firearm) {
+  spdlog::debug("{}.SwitchFirearm({})", *this, target_firearm);
   ws_client_->send(PerformSwitchArmMessage(token_, target_firearm).json());
 }
 
 void Agent::UseMedicine(MedicineKind target_medicine) {
+  spdlog::debug("{}.UseMedicine({})", *this, target_medicine);
   ws_client_->send(PerformUseMedicineMessage(token_, target_medicine).json());
 }
 
 void Agent::UseGrenade(Position<float> const& position) {
+  spdlog::debug("{}.UseGrenade({})", *this, position);
   ws_client_->send(PerformUseGrenadeMessage(token_, position).json());
 }
 
 void Agent::Move(Position<float> const& position) {
+  spdlog::debug("{}.Move({})", *this, position);
   ws_client_->send(PerformMoveMessage(token_, position).json());
 }
 
-void Agent::Stop() { ws_client_->send(PerformStopMessage(token_).json()); }
+void Agent::Stop() {
+  spdlog::debug("{}.Stop()", *this);
+  ws_client_->send(PerformStopMessage(token_).json());
+}
 
 void Agent::Attack(Position<float> const& position) {
+  spdlog::debug("{}.Attack({})", *this, position);
   ws_client_->send(PerformAttackMessage(token_, position).json());
 }
 
 void Agent::ChooseOrigin(Position<float> const& position) {
+  spdlog::debug("{}.ChooseOrigin({})", *this, position);
   ws_client_->send(ChooseOriginMessage(token_, position).json());
 }
 
 void Agent::Loop() {
-  // TODO(mzzy11): Implement loop.
-  // spdlog::debug("sending get player info message");
-  if (IsConnected()) {
+  try {
+    if (!IsConnected()) {
+      return;
+    }
+
     ws_client_->send(GetPlayerInfoMessage(token_).json());
+  } catch (std::exception const& e) {
+    spdlog::error("{} encountered an error in loop: {}", *this, e.what());
   }
 }
 
@@ -102,7 +117,7 @@ void Agent::OnMessage(Message const& message) {
     auto msg_type = msg_dict["messageType"].get<std::string>();
 
     if (msg_type == "ERROR") {
-      spdlog::error("error from server: {}",
+      spdlog::error("{} got an error from server: {}", *this,
                     msg_dict["message"].get<std::string>());
     } else if (msg_type == "PLAYERS_INFO") {
       all_player_info_ = std::vector<PlayerInfo>();
@@ -150,11 +165,10 @@ void Agent::OnMessage(Message const& message) {
       safe_zone_ = SafeZone{center, radius};
     } else if (msg_type == "PLAYER_ID") {
       self_id_ = msg_dict["playerId"].get<int>();
-    } else {
-      spdlog::warn("unknown message type: {}", msg_type);
     }
+
   } catch (std::exception const& e) {
-    spdlog::error("error occurred in message handling: {}", e.what());
+    spdlog::error("{} failed to handle a message: {}", *this, e.what());
   }
 }
 
