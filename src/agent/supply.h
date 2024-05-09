@@ -9,7 +9,7 @@ namespace thuai7_agent {
 
 enum class SupplyKind {
   kS686,
-  kVectory,
+  kVector,
   kAwm,
   kM16,
   kBullet,

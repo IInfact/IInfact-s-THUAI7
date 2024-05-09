@@ -51,6 +51,7 @@ struct PlayerInfo {
 
 auto format_as(ArmorKind object) -> std::string;
 auto format_as(FirearmKind object) -> std::string;
+auto format_as(MedicineKind object) -> std::string;
 auto format_as(ItemKind object) -> std::string;
 auto format_as(Item const& object) -> std::string;
 auto format_as(PlayerInfo const& object) -> std::string;
